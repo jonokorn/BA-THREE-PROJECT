@@ -37,7 +37,7 @@ const groundMaterial = new THREE.MeshBasicMaterial({
 });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
-//scene.add(ground);
+scene.add(ground);
 
 // --- Light Setup ---
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -75,6 +75,9 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
+    const windDirection = new THREE.Vector3(1, 0, 0);
+    const windStrength = 0.05;
+    treeBuilder.animateTree(windDirection, windStrength);
     renderer.render(scene, camera);
 }
 

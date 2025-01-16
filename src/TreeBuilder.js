@@ -1,13 +1,11 @@
-// TreeBuilder.js
 import * as THREE from 'three';
-import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 export class TreeBuilder {
     constructor(scene) {
         this.scene = scene;
+
         this.treeGroup = new THREE.Group();
-        this.combineMeshes = false;
-        this.finalTreeMesh = undefined;
+        this.scene.add(this.treeGroup);
 
         this.branchMaterial = new THREE.MeshNormalMaterial();
 
@@ -16,35 +14,52 @@ export class TreeBuilder {
             roughness: 0.7,
             metalness: 0.1
         });
+
+        this.bones = [];
+        this.animationClock = new THREE.Clock();
     }
 
     clear() {
+        while (this.treeGroup.children.length > 0) {
+            const object = this.treeGroup.children[0];
 
-        console.log("Clear");
-
-        if(this.combineMeshes && this.finalTreeMesh != undefined){
-            this.finalTreeMesh.geometry.dispose();
-            this.finalTreeMesh.material.dispose();
-            this.scene.remove(this.finalTreeMesh)
-            this.finalTreeMesh = undefined;
-        } else {
-            while (this.treeGroup.children.length > 0) {
-                const object = this.treeGroup.children[0];
-                object.geometry.dispose();
-                object.material.dispose();
-                this.treeGroup.remove(object);
+            if (object instanceof THREE.Mesh) {
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) object.material.dispose();
             }
+
+            if (object instanceof THREE.SkeletonHelper) {
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) object.material.dispose();
+            }
+
+            this.treeGroup.remove(object);
         }
+        this.bones = [];
     }
 
     buildTree(lSystem, params) {
+        // Clear previous tree
         this.clear();
 
+        const bones = [];
+        const vertices = [];
+        const indices = [];
+        const skinIndices = [];
+        const skinWeights = [];
+
+        // Create the root bone
+        const rootBone = new THREE.Bone();
+        rootBone.position.set(0, 0, 0);
+        bones.push(rootBone);
+
+        // State to track tree-building
         const state = {
             position: new THREE.Vector3(0, 0, 0),
             orientation: new THREE.Matrix3(),
             radius: params.startRadius,
-            stateStack: []
+            stateStack: [],
+            parentBone: rootBone
         };
 
         state.orientation.set(
@@ -53,11 +68,25 @@ export class TreeBuilder {
             0, 0, 1  // U
         );
 
+        let vertexOffset = 0;
+
         for (let char of lSystem) {
             switch (char) {
                 case 'f':
-                    this.createBranch(state, params);
+                    const newBone = this.createBranch(
+                        state,
+                        params,
+                        bones,
+                        vertices,
+                        indices,
+                        skinIndices,
+                        skinWeights,
+                        vertexOffset
+                    );
+                    vertexOffset = vertices.length / 3;
+                    state.parentBone = newBone;
                     break;
+
                 case 'l':
                     this.createLeaf(state);
                     break;
@@ -65,7 +94,8 @@ export class TreeBuilder {
                     state.stateStack.push({
                         position: state.position.clone(),
                         orientation: state.orientation.clone(),
-                        radius: state.radius
+                        radius: state.radius,
+                        parentBone: state.parentBone
                     });
                     break;
                 case ']':
@@ -74,6 +104,7 @@ export class TreeBuilder {
                         state.position.copy(savedState.position);
                         state.orientation.copy(savedState.orientation);
                         state.radius = savedState.radius;
+                        state.parentBone = savedState.parentBone;
                     }
                     break;
                 case '+':
@@ -92,47 +123,73 @@ export class TreeBuilder {
                     this.rotate(state, -params.angle, 'H');
                     break;
                 case '>':
-                    this.rotate(state, params.angle, 'H'); 
+                    this.rotate(state, params.angle, 'H');
                     break;
             }
         }
 
-        if (this.combineMeshes) {
-            let mesh = this.combineMeshesIntoOne();
-            this.finalTreeMesh = mesh;
-            this.scene.add(mesh);
-        } else {
-            this.scene.add(this.treeGroup);
-        }
+        const geometry = this.createSkinnedGeometry(vertices, indices, skinIndices, skinWeights);
+        const skinnedMesh = this.createSkinnedMesh(geometry, bones);
+        this.treeGroup.add(skinnedMesh);
+        this.bones = bones;
     }
 
-    createBranch(state, params) {
+    createBranch(state, params, bones, vertices, indices, skinIndices, skinWeights, vertexOffset) {
         const height = params.branchLength;
-        const geometry = new THREE.CylinderGeometry(
-            state.radius * params.radiusReduction,
-            state.radius,
-            height,
-            8
-        );
+        const segments = 8; // Cylinder Segmente
+        const baseRadius = state.radius;
+        const topRadius = baseRadius * params.radiusReduction;
 
-        const branch = new THREE.Mesh(geometry, this.branchMaterial);
+        const newBone = new THREE.Bone();
+        const direction = new THREE.Vector3(0, height, 0).applyMatrix3(state.orientation);
+        newBone.position.copy(direction);
+        state.parentBone.add(newBone);
+        bones.push(newBone);
 
-        // Transformation der Position
-        const direction = new THREE.Vector3(0, height / 2, 0)
-            .applyMatrix3(state.orientation);
+        const baseCenter = state.position.clone();
+        const topCenter = baseCenter.clone().add(direction);
+        state.position.copy(topCenter);
 
-        branch.position.copy(state.position.clone().add(direction));
+        // Add vertices for the Cylinder
+        for (let i = 0; i <= segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
 
-        // Rotation des Branches
-        const quaternion = new THREE.Quaternion();
-        quaternion.setFromRotationMatrix(new THREE.Matrix4().setFromMatrix3(state.orientation));
-        branch.quaternion.copy(quaternion);
+            // Bottom
+            const xBase = Math.cos(angle) * baseRadius;
+            const zBase = Math.sin(angle) * baseRadius;
+            const baseVertex = new THREE.Vector3(xBase, 0, zBase).applyMatrix3(state.orientation).add(baseCenter);
+            vertices.push(baseVertex.x, baseVertex.y, baseVertex.z);
 
-        this.treeGroup.add(branch);
+            // Top
+            const xTop = Math.cos(angle) * topRadius;
+            const zTop = Math.sin(angle) * topRadius;
+            const topVertex = new THREE.Vector3(xTop, height, zTop).applyMatrix3(state.orientation).add(baseCenter);
+            vertices.push(topVertex.x, topVertex.y, topVertex.z);
+        }
 
-        // Update der Turtle-Position
-        state.position.add(new THREE.Vector3(0, height, 0).applyMatrix3(state.orientation));
+        // Add indices for the faces of the cylinder
+        for (let i = 0; i < segments; i++) {
+            const baseIndex = vertexOffset + i * 2;
+            const nextBaseIndex = vertexOffset + ((i + 1) % segments) * 2;
+            indices.push(baseIndex, baseIndex + 1, nextBaseIndex + 1);
+            indices.push(baseIndex, nextBaseIndex + 1, nextBaseIndex);
+        }
+
+        // Skin-Weights and Skin-Indices
+        for (let i = 0; i <= segments; i++) {
+
+            // Base vertex (influenced by parent and current bone)
+            skinIndices.push(bones.length - 2, bones.length - 1, 0, 0);
+            skinWeights.push(0.8, 0.2, 0, 0);
+
+            // Top vertex (influenced more by current bone)
+            skinIndices.push(bones.length - 2, bones.length - 1, 0, 0);
+            skinWeights.push(0.2, 0.8, 0, 0);
+        }
+
         state.radius *= params.radiusReduction;
+
+        return newBone;
     }
 
     createLeaf(state) {
@@ -169,25 +226,78 @@ export class TreeBuilder {
                 );
                 break;
         }
+
         state.orientation.multiply(rotationMatrix);
     }
 
-    combineMeshesIntoOne() {
-        this.treeGroup.updateMatrixWorld(true);
-        let geometries = [];
+    createSkinnedGeometry(vertices, indices, skinIndices, skinWeights) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setIndex(indices);
+        geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndices, 4));
+        geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeights, 4));
+        geometry.computeVertexNormals();
+        return geometry;
+    }
 
-        this.treeGroup.children.forEach((child) => {
-            if (child.isMesh) {
-                const geometry = child.geometry.clone();
-                geometry.applyMatrix4(child.matrixWorld);
-                geometries.push(geometry);
+    createSkinnedMesh(geometry, bones) {
+        const skeleton = new THREE.Skeleton(bones);
+        const skinnedMesh = new THREE.SkinnedMesh(geometry, this.branchMaterial);
+
+        // Bind Skeleton to Mesh 
+        skinnedMesh.add(bones[0]);
+        skinnedMesh.bind(skeleton);
+
+        // Skeleton-Helper
+        const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh);
+        this.treeGroup.add(skeletonHelper);
+        skinnedMesh.visible = false; 
+
+        return skinnedMesh;
+    }
+
+    showMesh() {
+        this.treeGroup.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                object.visible = true;
+            }
+            if (object instanceof THREE.SkeletonHelper) {
+                object.visible = false;
             }
         });
+    }
 
-        let mergedGeometry = BufferGeometryUtils.mergeGeometries(geometries, true);
+    showSkeleton() {
+        this.treeGroup.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                object.visible = false;
+            }
+            if (object instanceof THREE.SkeletonHelper) {
+                object.visible = true;
+            }
+        });
+    }
 
-        let combinedTreeMesh = new THREE.Mesh(mergedGeometry, this.branchMaterial);
+    animateTree(windDirection = new THREE.Vector3(1, 0, 0), windStrength = 1.0) {
+        
+        const time = this.animationClock.getElapsedTime();
 
-        return combinedTreeMesh;
+        const sway = Math.sin(time * 0.5) * windStrength;
+
+        this.bones.forEach((bone, index) => {
+            if (index === 0) return;  // Skips the Root-Bone
+
+            const branchProgress = index / this.bones.length;
+
+            const swayAmplitude = sway * (1 + branchProgress);
+
+            const swayDelay = index * 0.1;
+
+            const swayX = windDirection.x * swayAmplitude * Math.sin(time + swayDelay);
+            const swayZ = windDirection.z * swayAmplitude * Math.sin(time + swayDelay);
+
+            bone.rotation.x = swayX;
+            bone.rotation.z = swayZ;
+        });
     }
 }
