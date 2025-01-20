@@ -3,8 +3,13 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { LSystemGenerator } from "./src/LSystemGenerator.js";
 import { TreeBuilder } from "./src/TreeBuilder.js";
 import { GUIController } from "./src/GUIController.js";
+import { createNoise3D } from "simplex-noise";
+
+// Noise 
+const noise3D = createNoise3D();
 
 // --- General Setup ---
+
 // Scene
 const scene = new THREE.Scene();
 
@@ -37,7 +42,7 @@ const groundMaterial = new THREE.MeshBasicMaterial({
 });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
-//scene.add(ground);
+scene.add(ground);
 
 // --- Light Setup ---
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -59,7 +64,6 @@ const treeParams = {
     angle: 10
 };
 
-// Create GUI controller with references to L-System generator and tree builder
 const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene);
 
 // Handle window resize
@@ -71,11 +75,33 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+
+// Function to log the number of meshes
+function logMeshCount() {
+    let meshCount = 0;
+
+    scene.traverse(function (obj) {
+        if (obj instanceof THREE.Mesh) {
+            meshCount++;
+        }
+    });
+
+    return meshCount;
+}
 // Animation loop
+
+const clock = new THREE.Clock();
+let time = 0.0;
 function animate() {
-    requestAnimationFrame(animate);
+    time += clock.getDelta();
+    let noise = noise3D(time, 0, 0); 
+    console.log(noise);
+    //console.log(noise)
+    treeBuilder.shaderMaterial.uniforms.noiseValue.value = noise;
+    treeBuilder.shaderMaterial.uniforms.time.value = time;
     controls.update();
     renderer.render(scene, camera);
+    requestAnimationFrame(animate);
 }
 
 animate();

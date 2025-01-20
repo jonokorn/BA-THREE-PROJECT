@@ -6,11 +6,98 @@ export class TreeBuilder {
     constructor(scene) {
         this.scene = scene;
         this.treeGroup = new THREE.Group();
-        this.combineMeshes = false;
-        this.finalTreeMesh = undefined;
+        this.combineMeshes = true;
+        this.combinedTreeMesh = undefined;
 
-        this.branchMaterial = new THREE.MeshNormalMaterial();
+        this.shaderMaterial = new THREE.ShaderMaterial({
+            vertexShader: `
 
+                #define PI 3.1415926535897932384626433832795; 
+
+                uniform float time;
+                uniform float speed;
+                uniform float amplitude;
+                uniform float baseThreshold;
+                uniform float noiseValue;
+                uniform bool useNoise;
+                uniform bool moveCircular; // New uniform variable
+        
+                attribute float branchRadius;
+                attribute float vertexYPosition;
+        
+                varying vec3 vNormal;
+                varying vec3 vPosition;
+        
+                void main() {
+
+                    // For the Fragment-Shader Normal-Coloring
+                    vNormal = normalize(normalMatrix * normal);
+                    vPosition = position;
+
+
+                    vec3 newPosition = position;
+        
+                    float swayFactor = vertexYPosition;
+                    if (swayFactor < baseThreshold) {
+                        swayFactor = 0.0;
+                    }
+
+                    // --- 
+
+                    float swayX = 0.0;
+                    float swayZ = 0.0; 
+        
+                    float adjustedTime = time * speed;
+        
+                    if (useNoise) {
+
+                        float angle = adjustedTime + noiseValue * PI;
+        
+                        if (moveCircular) {
+                            swayX = sin(angle) * amplitude * swayFactor;
+                            swayZ = cos(angle) * amplitude * swayFactor;
+                        } else {
+                            swayX = sin(angle) * amplitude * swayFactor;
+                        }
+                    } else {
+                        if (moveCircular) {
+                            swayX = sin(adjustedTime) * amplitude * swayFactor;
+                            swayZ = cos(adjustedTime) * amplitude * swayFactor;
+                        } else {
+                            swayX = sin(adjustedTime) * amplitude * swayFactor;
+                        }
+                    }
+        
+                    newPosition.x += swayX;
+                    newPosition.z += swayZ;
+        
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+                }
+            `,
+        
+            fragmentShader: `
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+        
+            void main() {
+                vec3 color = (vNormal + 1.0) * 0.5;
+                gl_FragColor = vec4(color, 1.0);
+            }
+            `,
+            side: THREE.FrontSide,
+            uniforms: {
+                time: { value: 0.0 },
+                speed: { value: 1.0 },
+                amplitude: { value: 0.025 },
+                baseThreshold: { value: 0.0 },
+                noiseValue: { value: 0.0 },
+                useNoise: { value: true },
+                moveCircular: { value: true }, 
+            },
+            vertexColors: true,
+            wireframe: false,
+        });
+        
         this.leafMaterial = new THREE.MeshStandardMaterial({
             color: 0x2d5a27,
             roughness: 0.7,
@@ -19,27 +106,17 @@ export class TreeBuilder {
     }
 
     clear() {
-
-        console.log("Clear");
-
-        if(this.combineMeshes && this.finalTreeMesh != undefined){
-            this.finalTreeMesh.geometry.dispose();
-            this.finalTreeMesh.material.dispose();
-            this.scene.remove(this.finalTreeMesh)
-            this.finalTreeMesh = undefined;
-        } else {
-            while (this.treeGroup.children.length > 0) {
-                const object = this.treeGroup.children[0];
-                object.geometry.dispose();
-                object.material.dispose();
-                this.treeGroup.remove(object);
-            }
+        if (this.combinedTreeMesh != undefined) {
+            this.combinedTreeMesh.geometry.dispose();
+            this.combinedTreeMesh.material.dispose();
+            this.scene.remove(this.combinedTreeMesh);
+            this.combinedTreeMesh = undefined;
         }
     }
 
     buildTree(lSystem, params) {
         this.clear();
-
+        
         const state = {
             position: new THREE.Vector3(0, 0, 0),
             orientation: new THREE.Matrix3(),
@@ -47,6 +124,7 @@ export class TreeBuilder {
             stateStack: []
         };
 
+        // Initialize orientation
         state.orientation.set(
             1, 0, 0, // H
             0, 1, 0, // L
@@ -54,7 +132,7 @@ export class TreeBuilder {
         );
 
         for (let char of lSystem) {
-            switch (char) {
+            switch(char) {
                 case 'f':
                     this.createBranch(state, params);
                     break;
@@ -71,7 +149,7 @@ export class TreeBuilder {
                 case ']':
                     if (state.stateStack.length > 0) {
                         const savedState = state.stateStack.pop();
-                        state.position.copy(savedState.position);
+                        state.position = savedState.position;
                         state.orientation.copy(savedState.orientation);
                         state.radius = savedState.radius;
                     }
@@ -92,14 +170,14 @@ export class TreeBuilder {
                     this.rotate(state, -params.angle, 'H');
                     break;
                 case '>':
-                    this.rotate(state, params.angle, 'H'); 
+                    this.rotate(state, params.angle, 'H');
                     break;
             }
         }
-
+        
         if (this.combineMeshes) {
             let mesh = this.combineMeshesIntoOne();
-            this.finalTreeMesh = mesh;
+            this.combinedTreeMesh = mesh;
             this.scene.add(mesh);
         } else {
             this.scene.add(this.treeGroup);
@@ -107,7 +185,9 @@ export class TreeBuilder {
     }
 
     createBranch(state, params) {
+
         const height = params.branchLength;
+        
         const geometry = new THREE.CylinderGeometry(
             state.radius * params.radiusReduction,
             state.radius,
@@ -115,23 +195,30 @@ export class TreeBuilder {
             8
         );
 
+        // Add branchRadius as a custom attribute to the vertices
+        const branchRadius = new Float32Array(geometry.attributes.position.count);
+        for (let i = 0; i < branchRadius.length; i++) {
+            branchRadius[i] = state.radius; // Use the current radius of the branch
+        }
+
+        geometry.setAttribute(
+            'branchRadius',
+            new THREE.BufferAttribute(branchRadius, 1)
+        );
+
         const branch = new THREE.Mesh(geometry, this.branchMaterial);
-
-        // Transformation der Position
-        const direction = new THREE.Vector3(0, height / 2, 0)
-            .applyMatrix3(state.orientation);
-
-        branch.position.copy(state.position.clone().add(direction));
-
-        // Rotation des Branches
-        const quaternion = new THREE.Quaternion();
-        quaternion.setFromRotationMatrix(new THREE.Matrix4().setFromMatrix3(state.orientation));
-        branch.quaternion.copy(quaternion);
+        
+        const direction = new THREE.Vector3(0, height, 0).applyMatrix3(state.orientation);
+        branch.position.copy(state.position).add(direction.clone().multiplyScalar(0.5));
+        const up = new THREE.Vector3(0, 1, 0).applyMatrix3(state.orientation);
+        
+        branch.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            up
+        );
 
         this.treeGroup.add(branch);
-
-        // Update der Turtle-Position
-        state.position.add(new THREE.Vector3(0, height, 0).applyMatrix3(state.orientation));
+        state.position.add(direction);
         state.radius *= params.radiusReduction;
     }
 
@@ -169,25 +256,31 @@ export class TreeBuilder {
                 );
                 break;
         }
+
         state.orientation.multiply(rotationMatrix);
     }
 
     combineMeshesIntoOne() {
         this.treeGroup.updateMatrixWorld(true);
-        let geometries = [];
+        let geometries = []
 
-        this.treeGroup.children.forEach((child) => {
+        this.treeGroup.children.forEach(child => {
             if (child.isMesh) {
                 const geometry = child.geometry.clone();
                 geometry.applyMatrix4(child.matrixWorld);
                 geometries.push(geometry);
             }
         });
-
+        
         let mergedGeometry = BufferGeometryUtils.mergeGeometries(geometries, true);
 
-        let combinedTreeMesh = new THREE.Mesh(mergedGeometry, this.branchMaterial);
+        const vertexYPosition = [];
+        for (let i = 0; i < mergedGeometry.attributes.position.count; i++) {
+            const vertexY = mergedGeometry.attributes.position.getY(i);
+            vertexYPosition.push(vertexY);
+        }
+        mergedGeometry.setAttribute('vertexYPosition', new THREE.BufferAttribute(new Float32Array(vertexYPosition), 1));
 
-        return combinedTreeMesh;
+        return new THREE.Mesh(mergedGeometry, this.shaderMaterial);
     }
 }
