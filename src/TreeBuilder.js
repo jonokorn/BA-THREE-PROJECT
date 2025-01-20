@@ -135,6 +135,7 @@ export class TreeBuilder {
     }
 
     createBranch(state, params, bones, vertices, indices, skinIndices, skinWeights, vertexOffset) {
+        
         const height = params.branchLength;
         const segments = 8; // Cylinder Segmente
         const baseRadius = state.radius;
@@ -178,13 +179,12 @@ export class TreeBuilder {
         // Skin-Weights and Skin-Indices
         for (let i = 0; i <= segments; i++) {
 
-            // Base vertex (influenced by parent and current bone)
+            // All Vertices influenced only by the current Bone, other variations caused weird Artefacts
             skinIndices.push(bones.length - 2, bones.length - 1, 0, 0);
-            skinWeights.push(0.8, 0.2, 0, 0);
+            skinWeights.push(0, 1.0, 0, 0);
 
-            // Top vertex (influenced more by current bone)
             skinIndices.push(bones.length - 2, bones.length - 1, 0, 0);
-            skinWeights.push(0.2, 0.8, 0, 0);
+            skinWeights.push(0, 1.0, 0, 0);
         }
 
         state.radius *= params.radiusReduction;
@@ -251,7 +251,7 @@ export class TreeBuilder {
         // Skeleton-Helper
         const skeletonHelper = new THREE.SkeletonHelper(skinnedMesh);
         this.treeGroup.add(skeletonHelper);
-        skinnedMesh.visible = false; 
+        skinnedMesh.visible = true; 
 
         return skinnedMesh;
     }
