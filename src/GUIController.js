@@ -2,11 +2,12 @@ import * as dat from 'dat.gui';
 import * as THREE from "three";
 
 export class GUIController {
-    constructor(lSystemGenerator, treeBuilder, initialParams, scene) {
+    constructor(lSystemGenerator, treeBuilder, initialParams, scene, toggleFreeze) {
         this.gui = new dat.GUI();
         this.lSystemGenerator = lSystemGenerator;
         this.treeBuilder = treeBuilder;
         this.scene = scene;
+        this.toggleFreeze = toggleFreeze;
 
         this.presets = {
             "Default": {
@@ -70,6 +71,7 @@ export class GUIController {
             regenerate: () => this.regenerateTree(),
             removeTree: () => this.removeTree(),
             logMeshCount: () => this.logMeshCount(),
+            toggleFreeze : () => this.toggleFreeze(),
         };
 
         this.setupGUI();
@@ -120,6 +122,9 @@ export class GUIController {
 
         // Add button to log the number of meshes
         this.gui.add(this.params, 'logMeshCount').name("Log Mesh Count");
+
+        // Add button to stop animation loop
+        this.gui.add(this.params, 'toggleFreeze').name("Toggle Animation")
     }
 
     applyPreset() {

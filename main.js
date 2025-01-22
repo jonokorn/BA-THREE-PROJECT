@@ -3,8 +3,21 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { LSystemGenerator } from "./src/LSystemGenerator.js";
 import { TreeBuilder } from "./src/TreeBuilder.js";
 import { GUIController } from "./src/GUIController.js";
+import Stats from "three/examples/jsm/libs/stats.module.js";
 
 // --- General Setup ---
+
+let freezeAnimation = false;
+function toggleFreeze () {
+    freezeAnimation = !freezeAnimation;
+}
+
+// Display Stats
+let stats = new Stats();
+stats.showPanel(0);
+stats.showPanel(1);
+document.body.append(stats.dom);
+
 // Scene
 const scene = new THREE.Scene();
 
@@ -60,7 +73,7 @@ const treeParams = {
 };
 
 // Create GUI controller with references to L-System generator and tree builder
-const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene);
+const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene, toggleFreeze);
 
 // Handle window resize
 window.addEventListener('resize', onWindowResize, false);
@@ -73,12 +86,20 @@ function onWindowResize() {
 
 // Animation loop
 function animate() {
-    requestAnimationFrame(animate);
+    stats.begin();
     controls.update();
-    const windDirection = new THREE.Vector3(1, 0, 0);
-    const windStrength = 0.05;
-    treeBuilder.animateTree(windDirection, windStrength);
+    const windDirection = new THREE.Vector3(1, 1, 1).normalize();
+    const windStrength = 5.0;
+
+    if (freezeAnimation != true)
+        treeBuilder.animateTree(windDirection, windStrength);
+    
     renderer.render(scene, camera);
+
+    //requestAnimationFrame(animate); // Capped at 60 FPS
+    setTimeout(animate, 0); // Uncapped
+
+    stats.end();
 }
 
 animate();

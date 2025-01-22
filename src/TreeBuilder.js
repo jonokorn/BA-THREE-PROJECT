@@ -51,7 +51,7 @@ export class TreeBuilder {
         // Create the root bone
         const rootBone = new THREE.Bone();
         rootBone.position.set(0, 0, 0);
-        bones.push(rootBone);
+        bones.push({index:0, radius: params.startRadius, bone: rootBone});
 
         // State to track tree-building
         const state = {
@@ -59,7 +59,8 @@ export class TreeBuilder {
             orientation: new THREE.Matrix3(),
             radius: params.startRadius,
             stateStack: [],
-            parentBone: rootBone
+            parentBone: rootBone, 
+            branchIndex: 0
         };
 
         state.orientation.set(
@@ -95,8 +96,10 @@ export class TreeBuilder {
                         position: state.position.clone(),
                         orientation: state.orientation.clone(),
                         radius: state.radius,
-                        parentBone: state.parentBone
+                        parentBone: state.parentBone, 
+                        branchIndex : state.branchIndex
                     });
+                    state.branchIndex++;
                     break;
                 case ']':
                     if (state.stateStack.length > 0) {
@@ -105,6 +108,7 @@ export class TreeBuilder {
                         state.orientation.copy(savedState.orientation);
                         state.radius = savedState.radius;
                         state.parentBone = savedState.parentBone;
+                        state.branchIndex = savedState.branchIndex;
                     }
                     break;
                 case '+':
@@ -145,7 +149,7 @@ export class TreeBuilder {
         const direction = new THREE.Vector3(0, height, 0).applyMatrix3(state.orientation);
         newBone.position.copy(direction);
         state.parentBone.add(newBone);
-        bones.push(newBone);
+        bones.push({index : state.branchIndex, radius: state.radius, bone: newBone});
 
         const baseCenter = state.position.clone();
         const topCenter = baseCenter.clone().add(direction);
@@ -241,11 +245,12 @@ export class TreeBuilder {
     }
 
     createSkinnedMesh(geometry, bones) {
-        const skeleton = new THREE.Skeleton(bones);
+        const boneObjects = bones.map(obj => obj.bone);
+        const skeleton = new THREE.Skeleton(boneObjects);
         const skinnedMesh = new THREE.SkinnedMesh(geometry, this.branchMaterial);
 
         // Bind Skeleton to Mesh 
-        skinnedMesh.add(bones[0]);
+        skinnedMesh.add(bones[0].bone);
         skinnedMesh.bind(skeleton);
 
         // Skeleton-Helper
@@ -278,26 +283,31 @@ export class TreeBuilder {
         });
     }
 
-    animateTree(windDirection = new THREE.Vector3(1, 0, 0), windStrength = 1.0) {
+    animateTree(windDirection, windStrength) {
         
+        windStrength = windStrength / 100; // Allows for larger numbers in the main file
+
+        // --- 
+
         const time = this.animationClock.getElapsedTime();
-
-        const sway = Math.sin(time * 0.5) * windStrength;
-
-        this.bones.forEach((bone, index) => {
-            if (index === 0) return;  // Skips the Root-Bone
-
-            const branchProgress = index / this.bones.length;
-
-            const swayAmplitude = sway * (1 + branchProgress);
-
+    
+        this.bones.forEach((boneObj, index) => {
+           
+            if (index === 0) return; // Skip the Root-Bone
+            //if (boneObj.index != 1) return;
+            
+            const branchFlexibility = 1.0;
+            const radiusInfluence = (1 / (boneObj.radius + 1)) * branchFlexibility; // Smaller radius = larger influence
             const swayDelay = index * 0.1;
-
-            const swayX = windDirection.x * swayAmplitude * Math.sin(time + swayDelay);
-            const swayZ = windDirection.z * swayAmplitude * Math.sin(time + swayDelay);
-
-            bone.rotation.x = swayX;
-            bone.rotation.z = swayZ;
+    
+            // Circular sway using sine and cosine
+            const swayX = windDirection.x * windStrength * radiusInfluence * Math.sin(time + swayDelay);
+            const swayZ = windDirection.z * windStrength * radiusInfluence * Math.cos(time + swayDelay);
+    
+            boneObj.bone.rotation.x = swayX;
+            boneObj.bone.rotation.z = swayZ;
         });
     }
+    
+    
 }
