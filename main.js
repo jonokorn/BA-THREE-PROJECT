@@ -4,11 +4,17 @@ import { LSystemGenerator } from "./src/LSystemGenerator.js";
 import { TreeBuilder } from "./src/TreeBuilder.js";
 import { GUIController } from "./src/GUIController.js";
 import { createNoise3D } from "simplex-noise";
+import Stats from "three/examples/jsm/libs/stats.module.js";
 
 // Noise 
 const noise3D = createNoise3D();
 
 // --- General Setup ---
+
+// Stats Display
+var stats = new Stats(); 
+stats.showPanel(1); 
+document.body.appendChild(stats.dom);
 
 // Scene
 const scene = new THREE.Scene();
@@ -93,15 +99,19 @@ function logMeshCount() {
 const clock = new THREE.Clock();
 let time = 0.0;
 function animate() {
+    stats.begin();
     time += clock.getDelta();
     let noise = noise3D(time, 0, 0); 
-    console.log(noise);
     //console.log(noise)
     treeBuilder.shaderMaterial.uniforms.noiseValue.value = noise;
     treeBuilder.shaderMaterial.uniforms.time.value = time;
     controls.update();
     renderer.render(scene, camera);
-    requestAnimationFrame(animate);
+
+    //requestAnimationFrame(animate);
+    setTimeout(animate, 0);
+
+    stats.end();
 }
 
 animate();
