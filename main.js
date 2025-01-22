@@ -3,8 +3,15 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { LSystemGenerator } from "./src/LSystemGenerator.js";
 import { TreeBuilder } from "./src/TreeBuilder.js";
 import { GUIController } from "./src/GUIController.js";
+import Stats from "three/examples/jsm/libs/stats.module.js";
 
 // --- General Setup ---
+
+// Stats Display 
+var stats = new Stats();
+stats.showPanel(1);
+document.body.appendChild(stats.dom);
+
 // Scene
 const scene = new THREE.Scene();
 
@@ -73,9 +80,13 @@ function onWindowResize() {
 
 // Animation loop
 function animate() {
-    requestAnimationFrame(animate);
+    stats.begin();
     controls.update();
     renderer.render(scene, camera);
+
+    //requestAnimationFrame(animate); // Capped at 60
+    setTimeout(animate, 0); // Uncapped
+    stats.end();
 }
 
 animate();
