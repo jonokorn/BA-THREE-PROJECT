@@ -39,16 +39,16 @@ controls.target.set(0,10,0);
 
 // --- Geometry Setup ---
 // Ground Plane
-const groundGeometry = new THREE.PlaneGeometry(10, 10);
-const groundMaterial = new THREE.MeshBasicMaterial({
-    color: 0x808080,
-    side: THREE.DoubleSide,
-    roughness: 0.8,
-    metalness: 0.2
-});
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2;
-scene.add(ground);
+// const groundGeometry = new THREE.PlaneGeometry(10, 10);
+// const groundMaterial = new THREE.MeshBasicMaterial({
+//     color: 0x808080,
+//     side: THREE.DoubleSide,
+//     roughness: 0.8,
+//     metalness: 0.2
+// });
+// const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+// ground.rotation.x = -Math.PI / 2;
+// scene.add(ground);
 
 // --- Light Setup ---
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -71,6 +71,8 @@ const treeParams = {
 };
 
 const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene);
+
+
 
 // Handle window resize
 window.addEventListener('resize', onWindowResize, false);
