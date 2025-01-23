@@ -6,10 +6,14 @@ export class TreeBuilder {
     constructor(scene) {
         this.scene = scene;
         this.treeGroup = new THREE.Group();
-        this.combineMeshes = false;
+        this.combineMeshes = true;
         this.finalTreeMesh = undefined;
 
-        this.branchMaterial = new THREE.MeshNormalMaterial();
+        //this.branchMaterial = new THREE.MeshNormalMaterial();
+        this.branchMaterial = new THREE.MeshPhongMaterial({
+            color: 'white', 
+            wireframe: true
+        })
 
         this.leafMaterial = new THREE.MeshStandardMaterial({
             color: 0x2d5a27,
@@ -42,16 +46,16 @@ export class TreeBuilder {
 
         const state = {
             position: new THREE.Vector3(0, 0, 0),
-            orientation: new THREE.Matrix3(),
+            orientation: params.orientation, //new THREE.Matrix3(),
             radius: params.startRadius,
             stateStack: []
         };
 
-        state.orientation.set(
-            1, 0, 0, // H
-            0, 1, 0, // L
-            0, 0, 1  // U
-        );
+        // state.orientation.set(
+        //     1, 0, 0, // H
+        //     0, 1, 0, // L
+        //     0, 0, 1  // U
+        // );
 
         for (let char of lSystem) {
             switch (char) {
@@ -98,9 +102,10 @@ export class TreeBuilder {
         }
 
         if (this.combineMeshes) {
-            let mesh = this.combineMeshesIntoOne();
-            this.finalTreeMesh = mesh;
-            this.scene.add(mesh);
+            let geometry = this.combineGeometriesIntoOne();
+            return geometry;
+            // this.finalTreeMesh = mesh;
+            // this.scene.add(mesh);
         } else {
             this.scene.add(this.treeGroup);
         }
@@ -170,6 +175,20 @@ export class TreeBuilder {
                 break;
         }
         state.orientation.multiply(rotationMatrix);
+    }
+
+    combineGeometriesIntoOne(){
+        this.treeGroup.updateMatrixWorld(true);
+        let geometries = [];
+        this.treeGroup.children.forEach((child) => {
+            if (child.isMesh) {
+                const geometry = child.geometry.clone();
+                geometry.applyMatrix4(child.matrixWorld);
+                geometries.push(geometry);
+            }
+        });
+        let mergedGeometry = BufferGeometryUtils.mergeGeometries(geometries, true);
+        return mergedGeometry;
     }
 
     combineMeshesIntoOne() {
