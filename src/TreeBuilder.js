@@ -118,7 +118,7 @@ export class TreeBuilder {
         this.clear();
         
         const state = {
-            position: new THREE.Vector3(0, 0, 0),
+            position: params.position,
             orientation: new THREE.Matrix3(),
             radius: params.startRadius,
             stateStack: []
@@ -178,7 +178,8 @@ export class TreeBuilder {
         if (this.combineMeshes) {
             let mesh = this.combineMeshesIntoOne();
             this.combinedTreeMesh = mesh;
-            this.scene.add(mesh);
+            //this.scene.add(mesh);
+            return mesh;
         } else {
             this.scene.add(this.treeGroup);
         }

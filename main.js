@@ -13,7 +13,7 @@ const noise3D = createNoise3D();
 
 // Stats Display
 var stats = new Stats(); 
-stats.showPanel(1); 
+stats.showPanel(0); 
 document.body.appendChild(stats.dom);
 
 // Scene
@@ -67,12 +67,26 @@ const treeParams = {
     startRadius: 1,
     radiusReduction: 0.8,
     branchLength: 1.0,
-    angle: 10
+    angle: 10,
+    position : new THREE.Vector3(0,0,0)
 };
+//const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene);
 
-const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene);
 
+// --- 
 
+lSystemGenerator.addRule('A', '^fB+^^B+vvB<<<<B');
+lSystemGenerator.addRule('B', '[^^ff--A]');
+const lSystemString = lSystemGenerator.generate('fffffA', 6); 
+
+const treeMesh = treeBuilder.buildTree(lSystemString, treeParams)
+scene.add(treeMesh);
+
+let gridPositions = generateGridPositions(500);
+
+gridPositions.forEach((pos) => {
+    createCopiesOfMesh(treeMesh, scene, pos)
+})
 
 // Handle window resize
 window.addEventListener('resize', onWindowResize, false);
@@ -114,6 +128,35 @@ function animate() {
     setTimeout(animate, 0);
 
     stats.end();
+}
+
+
+function createCopiesOfMesh(mesh, scene, position) {
+
+    const clone = mesh.clone();
+    
+    clone.position.set(position.x, position.y, position.z);
+
+    scene.add(clone);
+}
+
+function generateGridPositions(count, spacing = 5) {
+    const positions = [];
+    const gridSize = Math.ceil(Math.sqrt(count));
+    const halfGridSize = gridSize / 2;
+    
+    for (let i = 0; i < count; i++) {
+        const row = Math.floor(i / gridSize);
+        const col = i % gridSize;
+        
+        positions.push(new THREE.Vector3(
+            (col - halfGridSize + 0.5) * spacing,
+            0,
+            (row - halfGridSize + 0.5) * spacing
+        ));
+    }
+    
+    return positions;
 }
 
 animate();
