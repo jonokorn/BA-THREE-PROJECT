@@ -1,61 +1,37 @@
 import * as THREE from 'three';
 
 export class TreeBuilder {
+
     constructor(scene) {
-        this.scene = scene;
-
-        this.treeGroup = new THREE.Group();
-        this.scene.add(this.treeGroup);
-
+        this.scene          = scene;
+        this.treeArray      = [];
+        this.treeGroup      = new THREE.Group();
+        this.bones          = [];
+        this.animationClock = new THREE.Clock();
         this.branchMaterial = new THREE.MeshNormalMaterial();
-
-        this.leafMaterial = new THREE.MeshStandardMaterial({
-            color: 0x2d5a27,
+        this.leafMaterial   = new THREE.MeshStandardMaterial({
+            color    : 0x2d5a27,
             roughness: 0.7,
             metalness: 0.1
         });
-
-        this.bones = [];
-        this.animationClock = new THREE.Clock();
-    }
-
-    clear() {
-        while (this.treeGroup.children.length > 0) {
-            const object = this.treeGroup.children[0];
-
-            if (object instanceof THREE.Mesh) {
-                if (object.geometry) object.geometry.dispose();
-                if (object.material) object.material.dispose();
-            }
-
-            if (object instanceof THREE.SkeletonHelper) {
-                if (object.geometry) object.geometry.dispose();
-                if (object.material) object.material.dispose();
-            }
-
-            this.treeGroup.remove(object);
-        }
-        this.bones = [];
     }
 
     buildTree(lSystem, params) {
-        // Clear previous tree
-        this.clear();
 
-        const bones = [];
-        const vertices = [];
-        const indices = [];
+        const bones       = [];
+        const vertices    = [];
+        const indices     = [];
         const skinIndices = [];
         const skinWeights = [];
 
         // Create the root bone
         const rootBone = new THREE.Bone();
-        rootBone.position.set(0, 0, 0);
+        rootBone.position.set(params.position.x, params.position.y, params.position.z);
         bones.push({index:0, radius: params.startRadius, bone: rootBone});
 
         // State to track tree-building
         const state = {
-            position: new THREE.Vector3(0, 0, 0),
+            position: params.position,
             orientation: new THREE.Matrix3(),
             radius: params.startRadius,
             stateStack: [],
@@ -132,27 +108,36 @@ export class TreeBuilder {
             }
         }
 
-        const geometry = this.createSkinnedGeometry(vertices, indices, skinIndices, skinWeights);
+        // --- 
+
+        const geometry    = this.createSkinnedGeometry(vertices, indices, skinIndices, skinWeights);
         const skinnedMesh = this.createSkinnedMesh(geometry, bones);
+        
         this.treeGroup.add(skinnedMesh);
         this.bones = bones;
+
+        const obj = {
+            mesh    : skinnedMesh,
+            skeleton: bones
+        }
+
+        return obj;
     }
 
     createBranch(state, params, bones, vertices, indices, skinIndices, skinWeights, vertexOffset) {
         
-        const height = params.branchLength;
-        const segments = 8; // Cylinder Segmente
+        const height     = params.branchLength;
+        const segments   = 8; // Cylinder Segments
         const baseRadius = state.radius;
-        const topRadius = baseRadius * params.radiusReduction;
+        const topRadius  = baseRadius * params.radiusReduction;
+        const newBone    = new THREE.Bone();
+        const direction  = new THREE.Vector3(0, height, 0).applyMatrix3(state.orientation);
+        const baseCenter = state.position.clone();
+        const topCenter  = baseCenter.clone().add(direction);
 
-        const newBone = new THREE.Bone();
-        const direction = new THREE.Vector3(0, height, 0).applyMatrix3(state.orientation);
         newBone.position.copy(direction);
         state.parentBone.add(newBone);
         bones.push({index : state.branchIndex, radius: state.radius, bone: newBone});
-
-        const baseCenter = state.position.clone();
-        const topCenter = baseCenter.clone().add(direction);
         state.position.copy(topCenter);
 
         // Add vertices for the Cylinder
@@ -160,21 +145,21 @@ export class TreeBuilder {
             const angle = (i / segments) * Math.PI * 2;
 
             // Bottom
-            const xBase = Math.cos(angle) * baseRadius;
-            const zBase = Math.sin(angle) * baseRadius;
+            const xBase      = Math.cos(angle) * baseRadius;
+            const zBase      = Math.sin(angle) * baseRadius;
             const baseVertex = new THREE.Vector3(xBase, 0, zBase).applyMatrix3(state.orientation).add(baseCenter);
             vertices.push(baseVertex.x, baseVertex.y, baseVertex.z);
 
             // Top
-            const xTop = Math.cos(angle) * topRadius;
-            const zTop = Math.sin(angle) * topRadius;
+            const xTop      = Math.cos(angle) * topRadius;
+            const zTop      = Math.sin(angle) * topRadius;
             const topVertex = new THREE.Vector3(xTop, height, zTop).applyMatrix3(state.orientation).add(baseCenter);
             vertices.push(topVertex.x, topVertex.y, topVertex.z);
         }
 
         // Add indices for the faces of the cylinder
         for (let i = 0; i < segments; i++) {
-            const baseIndex = vertexOffset + i * 2;
+            const baseIndex     = vertexOffset + i * 2;
             const nextBaseIndex = vertexOffset + ((i + 1) % segments) * 2;
             indices.push(baseIndex, baseIndex + 1, nextBaseIndex + 1);
             indices.push(baseIndex, nextBaseIndex + 1, nextBaseIndex);
@@ -198,7 +183,7 @@ export class TreeBuilder {
 
     createLeaf(state) {
         const leafGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-        const leaf = new THREE.Mesh(leafGeometry, this.leafMaterial);
+        const leaf         = new THREE.Mesh(leafGeometry, this.leafMaterial);
         leaf.position.copy(state.position);
         this.treeGroup.add(leaf);
     }
@@ -235,18 +220,22 @@ export class TreeBuilder {
     }
 
     createSkinnedGeometry(vertices, indices, skinIndices, skinWeights) {
+
         const geometry = new THREE.BufferGeometry();
+
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
         geometry.setIndex(indices);
         geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndices, 4));
         geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeights, 4));
         geometry.computeVertexNormals();
+
         return geometry;
     }
 
     createSkinnedMesh(geometry, bones) {
+
         const boneObjects = bones.map(obj => obj.bone);
-        const skeleton = new THREE.Skeleton(boneObjects);
+        const skeleton    = new THREE.Skeleton(boneObjects);
         const skinnedMesh = new THREE.SkinnedMesh(geometry, this.branchMaterial);
 
         // Bind Skeleton to Mesh 
@@ -283,31 +272,17 @@ export class TreeBuilder {
         });
     }
 
-    animateTree(windDirection, windStrength) {
-        
-        windStrength = windStrength / 100; // Allows for larger numbers in the main file
 
-        // --- 
+    removeAllObjectsFromScene() {
 
-        const time = this.animationClock.getElapsedTime();
-    
-        this.bones.forEach((boneObj, index) => {
-           
-            if (index === 0) return; // Skip the Root-Bone
-            //if (boneObj.index != 1) return;
-            
-            const branchFlexibility = 1.0;
-            const radiusInfluence = (1 / (boneObj.radius + 1)) * branchFlexibility; // Smaller radius = larger influence
-            const swayDelay = index * 0.1;
-    
-            // Circular sway using sine and cosine
-            const swayX = windDirection.x * windStrength * radiusInfluence * Math.sin(time + swayDelay);
-            const swayZ = windDirection.z * windStrength * radiusInfluence * Math.cos(time + swayDelay);
-    
-            boneObj.bone.rotation.x = swayX;
-            boneObj.bone.rotation.z = swayZ;
-        });
+        this.scene.traverse((object) => {
+            if (object.isSkinnedMesh){
+
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) object.material.dispose();
+                if (object.skeleton) object.skeleton.dispose();
+            }
+        })
     }
-    
-    
+
 }

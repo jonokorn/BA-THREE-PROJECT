@@ -28,17 +28,4 @@ export class LSystemGenerator {
 
     }
 
-    // generate(axiom, iterations) {
-    //     let result = axiom;
-        
-    //     for (let i = 0; i < iterations; i++) {
-    //         let newResult = '';
-    //         for (let char of result) {
-    //             newResult += this.rules.get(char) || char;
-    //         }
-    //         result = newResult;
-    //     }
-    //     return result;
-    // }
-    
 }
