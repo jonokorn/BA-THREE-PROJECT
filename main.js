@@ -5,12 +5,14 @@ import { TreeBuilder } from "./src/TreeBuilder.js";
 import { GUIController } from "./src/GUIController.js";
 import Stats from "three/examples/jsm/libs/stats.module.js";
 import { createWebSocketModuleRunnerTransport } from "vite/module-runner";
+import { fill } from "three/src/extras/TextureUtils.js";
 
 // --- General Setup ---
+let mixers = [];
 
 // Stats Display 
 var stats = new Stats();
-stats.showPanel(1);
+
 document.body.appendChild(stats.dom);
 
 // Scene
@@ -30,22 +32,12 @@ const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+
 // Orbit Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0,10,0);
 
 // --- Geometry Setup ---
-// Ground Plane
-const groundGeometry = new THREE.PlaneGeometry(10, 10);
-const groundMaterial = new THREE.MeshBasicMaterial({
-    color: 0x808080,
-    side: THREE.DoubleSide,
-    roughness: 0.8,
-    metalness: 0.2
-});
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2;
-//scene.add(ground);
 
 // --- Light Setup ---
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -75,111 +67,36 @@ lSystemGenerator.addRule('B', '[^^ff--A]');
 const lSystemString = lSystemGenerator.generate('fffffA', 6); 
 const material = new THREE.MeshPhongMaterial({color:'white',wireframe:true});
 
-let orientationMat = new THREE.Matrix3()
-
-orientationMat.set(
-    1, 0, 0,
-    0, 1, 0,
-    0, 0, 1
-);
-
-const baseGeometry = treeBuilder.buildTree(lSystemString, {
+const morphGeometry = treeBuilder.buildTree(lSystemString, {
     startRadius: 1,
     radiusReduction: 0.8,
     branchLength: 1.0,
-    angle: 10,
-    orientation: orientationMat
+    angle: treeParams.angle,
+    position : new THREE.Vector3(0,0,0)
 })
 
-orientationMat.set(
-    1, 0, 0,
-    0, 0.95, 0.1,
-    0, -0.1, 0.95 
-);
+morphGeometry.morphAttributes.position = []
+let keyFrames = [];
 
-const targetGeometry = treeBuilder.buildTree(lSystemString, {
-    startRadius: 1,
-    radiusReduction: 0.8,
-    branchLength: 1.0,
-    angle: 12,
-    orientation: orientationMat
-})
-
-orientationMat.set(
-    1, 0, 0,
-    0, 1.05, 0.1,
-    0, 0.1, 1.05
-);
-
-const targetGeometry2 = treeBuilder.buildTree(lSystemString, {
-    startRadius: 1,
-    radiusReduction: 0.8,
-    branchLength: 1.0,
-    angle: 10,
-    orientation: orientationMat
-})
-
-
-
-console.log(baseGeometry)
-console.log(targetGeometry)
-// Get vertices from both geometries
-const basePositions = baseGeometry.attributes.position.array;
-const targetPositions = targetGeometry.attributes.position.array;
-const targetPositions2 = targetGeometry2.attributes.position.array;
-
-
-// Create a morphable geometry
-const morphGeometry = new THREE.BufferGeometry();
-morphGeometry.setAttribute('position', new THREE.Float32BufferAttribute(basePositions, 3));
-
-morphGeometry.setIndex(baseGeometry.index);
-
-morphGeometry.morphAttributes.position = [
-    new THREE.Float32BufferAttribute(targetPositions, 3)
-];
-
-morphGeometry.morphAttributes.position.push(
-    new THREE.Float32BufferAttribute(targetPositions2, 3)
-);
+createTreeVariation(morphGeometry, keyFrames, treeParams.angle);
 
 const mesh = new THREE.Mesh(morphGeometry, material); 
 scene.add(mesh)
 
-const morphKF = new THREE.NumberKeyframeTrack(
-    '.morphTargetInfluences[0]', // The property to animate
-    [0, 1], // Keyframe times (in seconds)
-    [0, 1]  // Values for morph influence (0 = base geometry, 1 = target geometry)
-);
-
-const morphKF2 = new THREE.NumberKeyframeTrack(
-    '.morphTargetInfluences[1]', // Index 1 for the second morph target
-    [1, 2], // Keyframe times (in seconds)
-    [0, 1]  // Values for morph influence (0 = base geometry, 1 = second target geometry)
-);
-
-
-const clip = new THREE.AnimationClip('morph', 2, [morphKF, morphKF2]);
-
-// Setup the animation mixer
+const clip = new THREE.AnimationClip('morph', -1, keyFrames);
 const mixer = new THREE.AnimationMixer(mesh);
 const action = mixer.clipAction(clip);
 
 // Configure the action
 action.setLoop(THREE.LoopPingPong); // Makes the animation go back and forth
-action.clampWhenFinished = true;
+action.clampWhenFinished = false;
 action.play();
 
+let gridPositions = generateGridPositions(10);
 
-
-console.log(baseGeometry)
-
-
-
-
-
-
-
+gridPositions.forEach((pos) => {
+    createCopiesOfMesh(mesh, scene, pos, mixers, clip)
+})
 // Handle window resize
 window.addEventListener('resize', onWindowResize, false);
 
@@ -188,15 +105,6 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
-
-let meshCount = 0;
-
-scene.traverse(function (obj) {
-    if (obj instanceof THREE.Mesh) {
-        meshCount++;
-    }
-});
-console.log("Meshes in the scene: " + meshCount);
 
 // Animation loop
 const clock = new THREE.Clock();
@@ -207,9 +115,92 @@ function animate() {
     controls.update();
     renderer.render(scene, camera);
     
+    mixers.forEach((mixr) => {
+        mixr.update(delta);
+    })
     //requestAnimationFrame(animate); // Capped at 60
     setTimeout(animate, 0); // Uncapped
     stats.end();
 }
+
+function createTreeVariation(morphGeometry, keyFrames, angle){
+
+    const amount = 1;
+
+    for(let i = 0; i <= amount; i++ ){
+
+        let  orientation = new THREE.Matrix3(); 
+        
+        orientation.set(
+            1,0,0,
+            0,1,0,
+            0,0,1
+        )
+
+        const baseGeometry = treeBuilder.buildTree(lSystemString, {
+            startRadius: 1,
+            radiusReduction: 0.8,
+            branchLength: 1.0,
+            angle: angle + ((i + 3) / 10),
+            orientation: orientation, 
+            position: new THREE.Vector3(0,0,0)
+        })
+
+        const positions = baseGeometry.attributes.position.array;
+
+        morphGeometry.morphAttributes.position.push(
+            new THREE.Float32BufferAttribute(positions, 3)
+        )
+
+        const kft = new THREE.NumberKeyframeTrack(
+            `.morphTargetInfluences[${i}]`,
+            [i, i + 1],
+            [0, 1]
+        );
+
+        keyFrames.push(kft);
+    }
+
+}
+
+function createCopiesOfMesh(mesh, scene, position, mixers, clip) {
+
+    const clone = mesh.clone();
+    
+    clone.position.set(position.x, position.y, position.z);
+
+    scene.add(clone);
+
+    const mixer = new THREE.AnimationMixer(clone);
+
+    const action = mixer.clipAction(clip);
+
+    action.setLoop(THREE.LoopPingPong);
+    action.clampWhenFinished = false;
+    action.play();  
+
+    mixers.push(mixer);
+
+}
+
+function generateGridPositions(count, spacing = 5) {
+    const positions = [];
+    const gridSize = Math.ceil(Math.sqrt(count));
+    const halfGridSize = gridSize / 2;
+    
+    for (let i = 0; i < count; i++) {
+        const row = Math.floor(i / gridSize);
+        const col = i % gridSize;
+        
+        positions.push(new THREE.Vector3(
+            (col - halfGridSize + 0.5) * spacing,
+            0,
+            (row - halfGridSize + 0.5) * spacing
+        ));
+    }
+    
+    return positions;
+}
+
 
 animate();

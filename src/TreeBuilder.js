@@ -42,20 +42,24 @@ export class TreeBuilder {
     }
 
     buildTree(lSystem, params) {
+
+        console.log(lSystem)
+        console.log(params)
+
         this.clear();
 
         const state = {
             position: new THREE.Vector3(0, 0, 0),
-            orientation: params.orientation, //new THREE.Matrix3(),
+            orientation: new THREE.Matrix3(),
             radius: params.startRadius,
             stateStack: []
         };
 
-        // state.orientation.set(
-        //     1, 0, 0, // H
-        //     0, 1, 0, // L
-        //     0, 0, 1  // U
-        // );
+        state.orientation.set(
+            1, 0, 0, // H
+            0, 1, 0, // L
+            0, 0, 1  // U
+        );
 
         for (let char of lSystem) {
             switch (char) {
