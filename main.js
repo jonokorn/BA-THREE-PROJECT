@@ -64,7 +64,7 @@ const lSystemString = lSystemGenerator.generate('fffffA', 6);
 
 const skeletonArray = []
 
-let gridPositions = generateGridPositions(10);
+let gridPositions = generateGridPositions(1);
 
 gridPositions.forEach((pos) => {
 
