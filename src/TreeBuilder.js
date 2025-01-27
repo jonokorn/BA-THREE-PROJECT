@@ -12,7 +12,7 @@ export class TreeBuilder {
         //this.branchMaterial = new THREE.MeshNormalMaterial();
         this.branchMaterial = new THREE.MeshPhongMaterial({
             color: 'white', 
-            wireframe: true
+            wireframe: false
         })
 
         this.leafMaterial = new THREE.MeshStandardMaterial({

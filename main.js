@@ -63,7 +63,7 @@ const treeParams = {
 // --- 
 
 lSystemGenerator.addRule('A', '^fB+^^B+vvB<<<<B');
-lSystemGenerator.addRule('B', '[^^ff--A]');
+lSystemGenerator.addRule('B', '[^^ff--Al]');
 const lSystemString = lSystemGenerator.generate('fffffA', 6); 
 const material = new THREE.MeshPhongMaterial({color:'white',wireframe:true});
 
@@ -92,7 +92,7 @@ action.setLoop(THREE.LoopPingPong); // Makes the animation go back and forth
 action.clampWhenFinished = false;
 action.play();
 
-let gridPositions = generateGridPositions(10);
+let gridPositions = generateGridPositions(1);
 
 gridPositions.forEach((pos) => {
     createCopiesOfMesh(mesh, scene, pos, mixers, clip)
