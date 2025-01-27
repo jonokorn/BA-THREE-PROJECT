@@ -76,13 +76,13 @@ const treeParams = {
 // --- 
 
 lSystemGenerator.addRule('A', '^fB+^^B+vvB<<<<B');
-lSystemGenerator.addRule('B', '[^^ff--A]');
+lSystemGenerator.addRule('B', '[^^ff--Al]');
 const lSystemString = lSystemGenerator.generate('fffffA', 6); 
 
 const treeMesh = treeBuilder.buildTree(lSystemString, treeParams)
 scene.add(treeMesh);
 
-let gridPositions = generateGridPositions(500);
+let gridPositions = generateGridPositions(10);
 
 gridPositions.forEach((pos) => {
     createCopiesOfMesh(treeMesh, scene, pos)

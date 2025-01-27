@@ -225,6 +225,19 @@ export class TreeBuilder {
 
     createLeaf(state) {
         const leafGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+
+        // Radius muss auch hier definiert werden, da alle Vertices die selbe Anzahl 
+        // an Attributen haben müsse für die Kombinierung zu einem Mesh in combineMeshesIntoOne()
+        const branchRadius = new Float32Array(leafGeometry.attributes.position.count);
+        for (let i = 0; i < branchRadius.length; i++) {
+            branchRadius[i] = state.radius; // Use the current radius of the branch
+        }
+
+        leafGeometry.setAttribute(
+            'branchRadius',
+            new THREE.BufferAttribute(branchRadius, 1)
+        );
+
         const leaf = new THREE.Mesh(leafGeometry, this.leafMaterial);
         leaf.position.copy(state.position);
         this.treeGroup.add(leaf);
