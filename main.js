@@ -56,7 +56,7 @@ const treeAnimator = new TreeAnimator();
 
 // --- 
 lSystemGenerator.addRule('A', '^fB+^^B+vvB<<<<B');
-lSystemGenerator.addRule('B', '[^^ff--A]');
+lSystemGenerator.addRule('B', '[^^ff--Al]');
 
 const lSystemString = lSystemGenerator.generate('fffffA', 6); 
 

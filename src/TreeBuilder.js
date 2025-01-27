@@ -183,9 +183,12 @@ export class TreeBuilder {
 
     createLeaf(state) {
         const leafGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-        const leaf         = new THREE.Mesh(leafGeometry, this.leafMaterial);
-        leaf.position.copy(state.position);
-        this.treeGroup.add(leaf);
+        const leaf = new THREE.Mesh(leafGeometry, this.leafMaterial);
+    
+        const direction = new THREE.Vector3(0, 0.3, 0).applyMatrix3(state.orientation);
+        leaf.position.copy(direction);
+    
+        state.parentBone.add(leaf);
     }
 
     rotate(state, angle, axis) {
