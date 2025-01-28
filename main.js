@@ -64,6 +64,7 @@ const lSystemString = lSystemGenerator.generate('fffffA', 6);
 
 const skeletonArray = []
 
+// Amount of trees that are generated
 let gridPositions = generateGridPositions(1);
 
 gridPositions.forEach((pos) => {
@@ -104,7 +105,6 @@ function logMeshCount() {
 }
 
 // --- Animation loop
-
 const windDirection = new THREE.Vector3(1,0,0);
 const windStrength  = 1.0;
 
