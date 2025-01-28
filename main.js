@@ -37,19 +37,6 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0,10,0);
 
-// --- Geometry Setup ---
-// Ground Plane
-// const groundGeometry = new THREE.PlaneGeometry(10, 10);
-// const groundMaterial = new THREE.MeshBasicMaterial({
-//     color: 0x808080,
-//     side: THREE.DoubleSide,
-//     roughness: 0.8,
-//     metalness: 0.2
-// });
-// const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-// ground.rotation.x = -Math.PI / 2;
-// scene.add(ground);
-
 // --- Light Setup ---
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
@@ -70,19 +57,23 @@ const treeParams = {
     angle: 10,
     position : new THREE.Vector3(0,0,0)
 };
-//const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene);
 
+
+// GUI Controller was disabled for the performance measurement 
+// with multiple Trees
+//const gui = new GUIController(lSystemGenerator, treeBuilder, treeParams, scene);
 
 // --- 
 
+// L-System-String Definition
 lSystemGenerator.addRule('A', '^fB+^^B+vvB<<<<B');
-lSystemGenerator.addRule('B', '[^^ff--Al]');
+lSystemGenerator.addRule('B', '[^^ff--A]');
 const lSystemString = lSystemGenerator.generate('fffffA', 6); 
 
 const treeMesh = treeBuilder.buildTree(lSystemString, treeParams)
 scene.add(treeMesh);
 
-let gridPositions = generateGridPositions(10);
+let gridPositions = generateGridPositions(2);
 
 gridPositions.forEach((pos) => {
     createCopiesOfMesh(treeMesh, scene, pos)
@@ -110,8 +101,8 @@ function logMeshCount() {
 
     return meshCount;
 }
-// Animation loop
 
+// Animation loop
 const clock = new THREE.Clock();
 let time = 0.0;
 function animate() {
@@ -129,7 +120,6 @@ function animate() {
 
     stats.end();
 }
-
 
 function createCopiesOfMesh(mesh, scene, position) {
 

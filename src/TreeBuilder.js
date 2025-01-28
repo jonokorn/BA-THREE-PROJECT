@@ -20,7 +20,7 @@ export class TreeBuilder {
                 uniform float baseThreshold;
                 uniform float noiseValue;
                 uniform bool useNoise;
-                uniform bool moveCircular; // New uniform variable
+                uniform bool moveCircular;
         
                 attribute float branchRadius;
                 attribute float vertexYPosition;
@@ -30,7 +30,7 @@ export class TreeBuilder {
         
                 void main() {
 
-                    // For the Fragment-Shader Normal-Coloring
+                    // For the Fragment-Shader Normal-Color
                     vNormal = normalize(normalMatrix * normal);
                     vPosition = position;
 
@@ -88,7 +88,7 @@ export class TreeBuilder {
             uniforms: {
                 time: { value: 0.0 },
                 speed: { value: 1.0 },
-                amplitude: { value: 0.025 },
+                amplitude: { value: 0.015 },
                 baseThreshold: { value: 0.0 },
                 noiseValue: { value: 0.0 },
                 useNoise: { value: true },
@@ -225,9 +225,8 @@ export class TreeBuilder {
 
     createLeaf(state) {
         const leafGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-
-        // Radius muss auch hier definiert werden, da alle Vertices die selbe Anzahl 
-        // an Attributen haben müsse für die Kombinierung zu einem Mesh in combineMeshesIntoOne()
+        // Radius has to be defined here aswell because all Vertices
+        // must have the same number of attributes for the combineMeshes() function
         const branchRadius = new Float32Array(leafGeometry.attributes.position.count);
         for (let i = 0; i < branchRadius.length; i++) {
             branchRadius[i] = state.radius; // Use the current radius of the branch
