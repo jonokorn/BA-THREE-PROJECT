@@ -92,7 +92,7 @@ action.setLoop(THREE.LoopPingPong); // Makes the animation go back and forth
 action.clampWhenFinished = false;
 action.play();
 
-let gridPositions = generateGridPositions(1);
+let gridPositions = generateGridPositions(250);
 
 gridPositions.forEach((pos) => {
     createCopiesOfMesh(mesh, scene, pos, mixers, clip)
