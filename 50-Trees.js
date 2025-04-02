@@ -65,7 +65,7 @@ const lSystemString = lSystemGenerator.generate('fffffA', 6);
 const skeletonArray = []
 
 // Amount of trees that are generated
-let gridPositions = generateGridPositions(1);
+let gridPositions = generateGridPositions(50);
 
 gridPositions.forEach((pos) => {
 
