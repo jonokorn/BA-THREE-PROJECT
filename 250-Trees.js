@@ -73,7 +73,7 @@ const lSystemString = lSystemGenerator.generate('fffffA', 6);
 const treeMesh = treeBuilder.buildTree(lSystemString, treeParams)
 //scene.add(treeMesh);
 
-let gridPositions = generateGridPositions(1);
+let gridPositions = generateGridPositions(250);
 
 gridPositions.forEach((pos) => {
     createCopiesOfMesh(treeMesh, scene, pos)
